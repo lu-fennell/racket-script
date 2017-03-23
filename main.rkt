@@ -26,9 +26,23 @@
 
 ;; Code here
 
+(require shell/pipeline
+         )
+
+(provide
+ (all-from-out shell/pipeline)
+ >>
+ )
+
+;; An alias for "run-pipeline"
+(define >> run-pipeline)
+
+
+
 (module+ test
   ;; Tests to be run with raco test
   )
+
 
 (module+ main
   ;; Main entry point, executed when run with the `racket` executable or DrRacket.
