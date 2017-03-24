@@ -26,16 +26,61 @@
 
 ;; Code here
 
-(require shell/pipeline
-         )
+(require
+  racket/match
+  racket/string
+  
+  shell/pipeline
+         (for-syntax shell/pipeline))
 
 (provide
  (all-from-out shell/pipeline)
- >>
+ $>
+ $$>
  )
 
 ;; An alias for "run-pipeline"
-(define >> run-pipeline)
+(define $> run-pipeline)
+
+;; "run-pipeline/out" with convenience modifiers
+;; TODO: what's up with stderror redirection?
+;; #:mod is one of '(lines trim concat raw)
+(define ($$> #:mod [mod 'trim]	 	 	 	 
+             #:end-exit-flag [end-exit-flag #t]	 	 	 	 
+             #:status-and? [status-and? #f]	 	 	 	 
+             . specs
+             )
+  (define raw-out
+    (apply run-pipeline/out specs
+         #:end-exit-flag end-exit-flag	 	 	 	 
+         #:status-and? status-and?	 	 	 	 
+         ))
+  (match mod
+    ['raw raw-out]
+    ['lines (string-split raw-out "\n")]
+    ['trim (string-trim raw-out)]
+    ['concat (string-join (string-split raw-out "\n") " ")]
+    [f #:when (procedure? f) (f raw-out)]))
+
+
+;; Path utilities (UNIX!) ;;;;;;;;;;;;;;;;;;;;;;
+;; TODO: document that I don't care about windows atm
+
+;; an alias for "build-path"
+;; TODO: check that we do not concatenate absolute paths
+(define +/+ build-path)
+
+;; like build path, but simplify first component (i.e. makes it absolute, even if it does not exist)
+;; TODO: not quite sure what I want here..
+(define (// path . paths)
+  (apply build-path (simplify-path path) paths))
+
+(define (~/ . paths)
+  (apply +/+ (find-system-path 'home-dir) paths))
+
+;; TODO: what else? drop a path left and right?
+
+;; Env utilities 
 
 
 
