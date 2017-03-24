@@ -29,18 +29,85 @@
 (require
   racket/match
   racket/string
+  racket/format
   
   shell/pipeline
-         (for-syntax shell/pipeline))
+  (for-syntax shell/pipeline))
 
 (provide
  (all-from-out shell/pipeline)
+ ;; Pipeline/command utilities
+ continue-on-error
  $>
  $$>
+ ?>
+ &&
+ ||
+
+ ;; Path utilities
+ +/+
+ ~/
  )
 
-;; An alias for "run-pipeline"
-(define $> run-pipeline)
+;; When true, $> will not throw an exception when the pipeline fails.
+;; In the (inverse) spirit of bash's "set -e"
+(define continue-on-error (make-parameter #f))
+
+;; A wrapper around "run-pipeline" which sets status-and? to #t and throws an error when the pipeline fails
+(define ($>
+         #:in [in (current-input-port)]	 	 	 	 
+         #:out [out (current-output-port)]	 	 	 	 
+         #:default-err [default-err (current-error-port)]	 	 	 	 
+         #:end-exit-flag [end-exit-flag #t]	 	 	 	 
+         #:status-and? [status-and? #t]	 	 	 	 
+         #:background? [bg? #f]
+         . specs)
+  (define status (apply run-pipeline
+                        #:in in	 	 	 	 
+                        #:out out	 	 	 	 
+                        #:default-err default-err	 	 	 	 
+                        #:end-exit-flag end-exit-flag	 	 	 	 
+                        #:status-and? status-and?	 	 	 	 
+                        #:background? bg?
+                        specs
+                        ))
+  (unless (or (pipeline-success? status) (continue-on-error))
+    ;; TODO: the error message should be more like the one of run-pipeline/out
+    (error (~a "Pipeline " (~s specs) " failed: " status)))
+  status)
+
+
+
+;; Like $> but don't error out on unsuccessful pipelines
+(define (?>
+         #:in [in (current-input-port)]	 	 	 	 
+         #:out [out (current-output-port)]	 	 	 	 
+         #:default-err [default-err (current-error-port)]	 	 	 	 
+         #:end-exit-flag [end-exit-flag #t]	 	 	 	 
+         #:status-and? [status-and? #t]	 	 	 	 
+         #:background? [bg? #f]
+         . specs)
+  (define status (apply run-pipeline
+                        #:in in	 	 	 	 
+                        #:out out	 	 	 	 
+                        #:default-err default-err	 	 	 	 
+                        #:end-exit-flag end-exit-flag	 	 	 	 
+                        #:status-and? status-and?	 	 	 	 
+                        #:background? bg?
+                        specs
+                        ))
+  
+  (pipeline-success? status))
+
+;; Version of and/sucess that works with $> (by setting continue-on-error to #t)
+(define-syntax-rule (&& pipelines ...)
+  (parameterize ([continue-on-error #t])
+    (and/success pipelines ...)))
+
+;; Version of or/sucess that works with $> (by setting continue-on-error to #t)
+(define-syntax-rule (|| pipelines ...)
+  (parameterize ([continue-on-error #t])
+    (or/success pipelines ...)))
 
 ;; "run-pipeline/out" with convenience modifiers
 ;; TODO: what's up with stderror redirection?
