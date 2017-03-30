@@ -38,14 +38,20 @@
  (all-from-out shell/pipeline)
  ;; Pipeline/command utilities
  continue-on-error
+ run-pipeline/script
  $>
+ run-pipeline/script/out
  $$>
+ run-pipeline/script/success?
  ?>
+ and/success/script
  &&
+ or/success/script
  ||
 
  ;; Path utilities
  +/+
+ build-path-home
  ~/
  )
 
@@ -53,8 +59,9 @@
 ;; In the (inverse) spirit of bash's "set -e"
 (define continue-on-error (make-parameter #f))
 
-;; A wrapper around "run-pipeline" which sets status-and? to #t and throws an error when the pipeline fails
-(define ($>
+;; A wrapper around "run-pipeline" which sets
+;; status-and? to #t and throws an error when the pipeline fails
+(define (run-pipeline/script
          #:in [in (current-input-port)]	 	 	 	 
          #:out [out (current-output-port)]	 	 	 	 
          #:default-err [default-err (current-error-port)]	 	 	 	 
@@ -76,10 +83,12 @@
     (error (~a "Pipeline " (~s specs) " failed: " status)))
   status)
 
+;; a wrapper around run-pipeline/script
+(define $> run-pipeline/script)
 
 
-;; Like $> but don't error out on unsuccessful pipelines
-(define (?>
+;; Like run-pipeline/script but don't error out on unsuccessful pipelines
+(define (run-pipeline/script/success?
          #:in [in (current-input-port)]	 	 	 	 
          #:out [out (current-output-port)]	 	 	 	 
          #:default-err [default-err (current-error-port)]	 	 	 	 
@@ -99,20 +108,28 @@
   
   (pipeline-success? status))
 
+;; Alias for run-pipeline/script/success?
+(define ?> run-pipeline/script/success?)
+
 ;; Version of and/sucess that works with $> (by setting continue-on-error to #t)
-(define-syntax-rule (&& pipelines ...)
+(define-syntax-rule (and/success/script pipelines ...)
   (parameterize ([continue-on-error #t])
     (and/success pipelines ...)))
 
+;; an alias for and/success/script
+(define-syntax-rule (&& pipelines ...) (and/success/script pipelines ...))
+
 ;; Version of or/sucess that works with $> (by setting continue-on-error to #t)
-(define-syntax-rule (|| pipelines ...)
+(define-syntax-rule (or/success/script pipelines ...)
   (parameterize ([continue-on-error #t])
     (or/success pipelines ...)))
+
+(define-syntax-rule (|| pipelines ...) (or/success/script pipelines ...))
 
 ;; "run-pipeline/out" with convenience modifiers
 ;; TODO: what's up with stderror redirection?
 ;; #:mod is one of '(lines trim concat raw)
-(define ($$> #:mod [mod 'trim]	 	 	 	 
+(define (run-pipeline/script/out #:mod [mod 'trim]	 	 	 	 
              #:end-exit-flag [end-exit-flag #t]	 	 	 	 
              #:status-and? [status-and? #f]	 	 	 	 
              . specs
@@ -129,6 +146,8 @@
     ['concat (string-join (string-split raw-out "\n") " ")]
     [f #:when (procedure? f) (f raw-out)]))
 
+;; Alias for run-pipeline/script/out
+(define $$> run-pipeline/script/out)
 
 ;; Path utilities (UNIX!) ;;;;;;;;;;;;;;;;;;;;;;
 ;; TODO: document that I don't care about windows atm
@@ -142,8 +161,10 @@
 (define (// path . paths)
   (apply build-path (simplify-path path) paths))
 
-(define (~/ . paths)
+(define (build-path-home . paths)
   (apply +/+ (find-system-path 'home-dir) paths))
+
+(define ~/ build-path-home)
 
 ;; TODO: what else? drop a path left and right?
 
