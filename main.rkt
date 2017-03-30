@@ -30,6 +30,7 @@
   racket/match
   racket/string
   racket/format
+  racket/list
   
   shell/pipeline
   (for-syntax shell/pipeline))
@@ -167,6 +168,26 @@
 (define ~/ build-path-home)
 
 ;; TODO: what else? drop a path left and right?
+;;       transplant?
+
+;;
+(define (path-prefix? prefix path)
+  (list-prefix? (explode-path prefix) (explode-path path)))
+;; take transplant path from old-root to new-root.
+;; old root has to be a root of new-root
+;; old root should not be empty
+(define (path-transplant path old-root new-root)
+  (unless (path-prefix? old-root path)
+    (raise-arguments-error 'path-transplant
+                           "old-root is not a prefix of path"
+                           "old-root" old-root
+                           "path" path))
+  (define path-to-transplant
+    (let-values ([(ignore result)
+                  (drop-common-prefix (explode-path old-root)
+                                      (explode-path path))])
+      result))
+  (apply +/+ new-root path-to-transplant))
 
 ;; Env utilities 
 
@@ -174,6 +195,19 @@
 
 (module+ test
   ;; Tests to be run with raco test
+
+
+  ;; path utils
+  (check-equal? (path-transplant "/hello/world" "/hello/" "/yo")
+                (string->path "/yo/world"))
+  (check-equal? (path-transplant "./hello/world" "./hello/" "/yo")
+                (string->path "/yo/world"))
+  (check-equal? (path-transplant "./hello/world" "./hello" "/yo")
+                (string->path "/yo/world"))
+  (check-exn exn:fail:contract?
+             (λ() (path-transplant "/hello/world" "/hel" "/yo")))
+  (check-exn exn:fail:contract?
+             (λ() (path-transplant "/hello/world" "/yo" "/world")))
   )
 
 
